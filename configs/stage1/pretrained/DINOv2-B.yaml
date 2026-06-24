@@ -1,0 +1,15 @@
+stage_1:
+  target: src.stage1.RAE
+  params:
+    encoder_cls: 'Dinov2withNorm'
+    encoder_config_path: 'F:\chexiao\project\RAE\checkpoint\RAE-collections\encoder\dinov2\vit_b'
+    encoder_input_size: 224
+    encoder_params:
+      dinov2_path: 'F:\chexiao\project\RAE\checkpoint\RAE-collections\encoder\dinov2\vit_b'
+      normalize: true
+    decoder_config_path: 'F:\chexiao\project\RAE\configs\decoder\ViTXL'
+    pretrained_decoder_path: 'F:\chexiao\project\RAE\checkpoint\RAE-collections\decoders\dinov2\wReg_base\ViTXL_n08\model.pt'
+    noise_tau: 0.0
+    reshape_to_2d: true
+    normalization_stat_path: 'F:\chexiao\project\RAE\checkpoint\RAE-collections\stats\dinov2\wReg_base\imagenet1k\stat.pt'
+  ckpt: 'F:\chexiao\project\RAE\result\WLASL_RAE\checkpoints\epoch_02.pt'

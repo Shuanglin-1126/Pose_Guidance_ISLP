@@ -1,0 +1,104 @@
+stage_1:
+  target: src.stage1.RAE
+  params:
+    encoder_cls: 'Dinov2withNorm'
+    encoder_config_path: '\checkpoint\RAE-collections\encoder\dinov2\vit_b'
+    encoder_input_size: 224
+    encoder_params:
+      dinov2_path: '\checkpoint\RAE-collections\encoder\dinov2\vit_b'
+      normalize: true
+    decoder_config_path: '\configs\decoder\ViTXL'
+    pretrained_decoder_path: '\checkpoint\RAE-collections\decoders\dinov2\wReg_base\ViTXL_n08\model.pt'
+    noise_tau: 0.0
+    reshape_to_2d: true
+    normalization_stat_path: '\checkpoint\RAE-collections\stats\dinov2\wReg_base\imagenet1k\stat.pt'
+  ckpt: '\result\WLASL_RAE\checkpoints\epoch_02.pt'
+
+stage_2:
+  target: re_flow.model.DDT.DiTwDDTHead
+  params:
+    input_size: 16
+    patch_size: 1
+    in_channels: 768
+    hidden_size: [1152, 2048]
+    depth: [28, 2]
+    num_heads: [16, 16]
+    mlp_ratio: 4.0
+    use_qknorm: true
+    use_swiglu: true
+    use_rope: true
+    use_rmsnorm: true
+    wo_shift: false
+    use_pos_embed: true
+    use_LORA: true
+    LORA_rank: 16
+    LORA_alpha: 1.
+    GCN_cfg:
+      graph_cfg:
+        mode: 'spatial'
+      adaptive: 'init'
+      with_res: true
+      in_channels: 3
+      base_channels: 64
+      ch_ratio: 4
+      dropout_prob: 0.1
+      num_stages: 3
+      inflate_stages: [2, 3]
+      down_stages: [2 ,3]
+  ckpt_path: '\checkpoint\RAE-collections\DiTs\Dinov2\wReg_base\ImageNet256\DiTDH-XL\stage2_model.pt'
+
+dataset:
+  data: 'WLASL'
+  information_path: '\WLASL\information\wlasl2000_all_frames.txt'
+  root_path: '\WLASL\origin_frame'
+  keypoints_body_path: '\WLASL\body_keypoint_133'
+  num_frames: 8
+  crops: 3
+
+transport:
+  params:
+    path_type: 'Linear'
+    prediction: 'velocity'
+    loss_weight: null
+    time_dist_type: 'logit-normal_0_1'
+
+sampler:
+  mode: ODE
+  params:
+    sampling_method: 'euler'
+    num_steps: 50
+    atol: 1.0e-6
+    rtol: 1.0e-3
+    reverse: false
+
+guidance:
+  method: 'cfg'
+  scale: 1.0
+  t_min: 0.0
+  t_max: 1.0
+
+misc:
+  latent_size: [768, 16, 16] # [C, H, W]
+  num_classes: 1000
+  time_dist_shift_dim: 196608 # 16*16*768
+  time_dist_shift_base: 4096
+
+training:
+  global_seed: 42
+  epochs: 10
+  global_batch_size: 1
+  grad_accum_steps: 1 # change according to your GPU memory
+  ema_decay: 0.9995
+  num_workers: 4
+  log_every: 100  #iter
+  ckpt_every: 1  # epoch
+  sample_every: 1   # epoch
+  base_lr: 0.0001
+  final_lr: 0.00001
+  beta: [0.9, 0.95]
+  wd: 0.0
+  schedule_type: 'linear'
+  decay_start_epoch: 1
+  decay_end_epoch: 8
+  clip_grad: 1.0
+  use_LORA: true
