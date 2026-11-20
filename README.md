@@ -1,59 +1,73 @@
 # Pose_Guidance_ISLP
-Only using a RTX 4090 for sign language production
 
-<div align="center">
-<h1>Pose_Guidance_ISLP </h1>
-<h3>We utilize human body keypoints and reference subject images as control conditions to generate sign language images matching target motions, then synthesize the final sign language video from multiple generated frames. Notably, this project adopts LoRA fine-tuning, enabling training of large feature encoders (the large-scale ViT and a 30-layer DDT with a channel width of 1152) on a single NVIDIA RTX 4090 GPU.</h3>
+Pose-conditioned isolated sign video generation with a representation autoencoder and flow matching. Given a reference image of a signer and a sequence of body, hand, and facial keypoints, this project generates frames that follow the supplied poses while using the reference image to guide appearance. The generated frames are assembled into a video.
 
-</div>
+## Technical report
 
+**Adapting Representation-Autoencoder Flow Matching for Pose-Conditioned Isolated Sign Video Production: A Technical Report**
+
+Che Xiao · 12 October 2026
+
+**[Read the full paper (PDF)](report/ISLP_paper.pdf)**
+
+The report documents the implementation, WLASL and SLR500 training artifacts, WLASL evaluation summaries, and the observed trade-off between pose agreement and appearance under classifier-free guidance. It is an implementation record and bounded analysis, rather than a state-of-the-art comparison.
+
+| Evaluation in the report | Metric | Reported value |
+| --- | --- | ---: |
+| WLASL image reconstruction | FID | 12.46 |
+| WLASL image reconstruction | SSIM | 0.92 |
+| WLASL frame generation, averaged over 100 clips | SSIM | 0.494 |
+| WLASL frame generation, averaged over 100 clips | PSNR | 11.454 dB |
+
+Reconstruction and generation measure different tasks, so their scores should not be compared directly. The generation results reflect the difficulty of framewise synthesis and background mismatch. The report does not evaluate sign-language semantic correctness or establish temporal consistency.
 
 ## Method
-**First, we employ HRNet coupled with the DARK detector pre-trained on the COCO-WholeBody dataset to detect human keypoints from sign language videos, and retain a total of 67 keypoints covering the face, upper arms and hands.**
+
+1. **Extract pose conditions.** HRNet with the DARK detector extracts 67 keypoints covering the upper body, hands, and face.
+2. **Learn an image representation.** A frozen DINOv2-B encoder and a trained ViT decoder form the representation autoencoder.
+3. **Generate conditioned frames.** A DDT-style transformer predicts a latent velocity field with flow matching. Reference-image prefix tokens participate in self-attention; a graph encoder converts the keypoints into pose conditions.
+4. **Assemble the video.** Euler integration samples each frame, and the frames are placed in temporal order. The model generates frames separately and has no temporal module.
+
 <p align="center">
-  <img src="assets/1.png" alt="architecture" width="80%">
+  <img src="assets/1.png" alt="Table of the 67 keypoint indices" width="80%">
 </p>
 <p align="center">
-  <img src="assets/2.png" alt="architecture" width="80%">
-</p>
-
-**The overall pipeline leverages latent space diffusion with velocity-prediction-based diffusion computation; the image encoder and decoder are trained exclusively on sign language datasets.**
-<p align="center">
-  <img src="assets/3.png" alt="architecture" width="80%">
-</p>
-
-**This work takes DDT as the base diffusion model. Since generating sign language images requires two conditional inputs: human body keypoint sequences (to regulate the signer’s movements in generated frames) and reference identity images (to control the subject’s appearance), we revise the conditional control mechanism of DDT: features extracted from reference identity images are concatenated with noisy latent variables to achieve feature interaction during attention computation. For human body keypoint data, we extract features via a three-layer stacked graph convolutional network, followed by normalization for conditional modulation.**
-<p align="center">
-  <img src="assets/4.png" alt="architecture" width="80%">
+  <img src="assets/2.png" alt="Pose condition examples" width="80%">
 </p>
 <p align="center">
-  <img src="assets/5.png" alt="architecture" width="80%">
+  <img src="assets/3.png" alt="Representation autoencoder architecture" width="80%">
+</p>
+<p align="center">
+  <img src="assets/4.png" alt="DDT-style conditional transformer architecture" width="80%">
+</p>
+<p align="center">
+  <img src="assets/5.png" alt="Graph-based pose encoder architecture" width="80%">
 </p>
 
-## Getting Started
+## Getting started
 
-We recommend using the pytorch>=2.3, cuda>=11.8, transformers.
+The project recommends PyTorch >= 2.3, CUDA >= 11.8, and Transformers. The training setup is designed for a single NVIDIA RTX 4090 using LoRA where applicable. Configure the dataset and checkpoint paths in the relevant files under `re_flow/config/` before running the scripts.
 
-### Model Training and Inference
+### Train
 
-**Train:**
 ```bash
-# stage1
+# Stage 1: representation autoencoder
 python re_flow/train_RAE.py
-# stage2
+
+# Stage 2: conditional flow model
 python re_flow/train.py
 ```
 
-**Inference:**
+### Inference
+
 ```bash
 python re_flow/sample.py
 ```
 
+## Scope and limitations
+
+This project starts from a supplied keypoint sequence and reference image. It does not translate text into sign language or predict the keypoint sequence. In the report's displayed classifier-free guidance examples, stronger guidance improves pose agreement while larger scales can reduce appearance fidelity; these observations do not define a universal guidance setting. See the [technical report](report/ISLP_paper.pdf) for experimental details and interpretation.
+
 ## Acknowledgment
 
-This project is built upon the following open-source works:
-
-- **RAE**：  Diffusion Transformers With Representation Autoencoders([paper](https://arxiv.org/abs/2510.11690), Code available at [code](https://github.com/bytetriper/RAE)), We used the model architecture and training pipeline from this repository.
-
-We thank the authors for their contributions and open-sourcing these valuable tools.
-
+This project builds on [Representation Autoencoders](https://arxiv.org/abs/2510.11690) and its [open-source implementation](https://github.com/bytetriper/RAE). We thank the authors for their contributions.
